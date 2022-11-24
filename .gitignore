@@ -2,3 +2,4 @@ __pycache__
 data/*
 dictionary/*
 pickle/*
+saved_model/*
