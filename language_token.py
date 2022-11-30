@@ -20,17 +20,20 @@ import nltk
 
 with open('dictionary/combined-malay-dict.txt', encoding="utf8") as fp:
     malay_dict = set([x.strip() for x in fp.readlines()])
-    
+
 eng_dict = set(nltk.corpus.words.words())
-    
+
+
 def detect_malay(text): return text in malay_dict
 def detect_english(text): return text in eng_dict
 
 
-special_token_list = set(['[CLS]', '[SEP]', '[PAD]', '[UNK]'])
+special_token_list = set(
+    ['[CLS]', '[SEP]', '[PAD]', '[UNK]', '<s>', '</s>', '<pad>', '<unk>', '<mask>'])
 
-lang_id2num = { 'special_token': 0, 'english': 1, 'malay': 2, 'other': 3 }
-lang_num2id = {v:k for k,v in lang_id2num.items()}
+lang_id2num = {'special_token': 0, 'english': 1, 'malay': 2, 'other': 3}
+lang_num2id = {v: k for k, v in lang_id2num.items()}
+
 
 def detect_lang(text):
     if text in special_token_list:
@@ -42,13 +45,13 @@ def detect_lang(text):
     else:
         return 'other'
 
-def get_lang_tokens(input_tokens):
-    decoded_tokens = [x.replace(' ', '') for x in reversed(tokenizer.batch_decode(input_tokens))]
+
+def get_lang_tokens(decoded_input_tokens):
     language_ids = []
-    
+
     full_sentence = ''
     token_count = 0
-    for token in decoded_tokens:
+    for token in decoded_input_tokens:
         if '##' in token:
             full_sentence = token[2:] + full_sentence
             token_count += 1
@@ -59,8 +62,8 @@ def get_lang_tokens(input_tokens):
         lang_token = lang_id2num[detect_lang(full_sentence)]
         for _ in range(token_count):
             language_ids.append(lang_token)
-        
+
         full_sentence = ''
         token_count = 0
-        
+
     return language_ids
