@@ -1,5 +1,10 @@
 __pycache__
-data/*
+
+data/malaya/*
+data/scrapping/*
+
 dictionary/*
+!dictionary/combined-malay-dict.txt
+
 pickle/*
 saved_model/*
