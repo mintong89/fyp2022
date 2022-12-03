@@ -18,7 +18,7 @@ import nltk
 #         if item:
 #             fp.write("%s\n" % item)
 
-with open('dictionary/combined-malay-dict.txt', encoding="utf8") as fp:
+with open('../../dictionary/combined-malay-dict.txt', encoding="utf8") as fp:
     malay_dict = set([x.strip() for x in fp.readlines()])
 
 eng_dict = set(nltk.corpus.words.words())
@@ -29,7 +29,7 @@ def detect_english(text): return text in eng_dict
 
 
 special_token_list = set(
-    ['[CLS]', '[SEP]', '[PAD]', '[UNK]', '<s>', '</s>', '<pad>', '<unk>', '<mask>'])
+    ['[CLS]', '[SEP]', '[PAD]', '[UNK]', '<s>', '</s>', '<pad>', '<unk>', '<mask>', '<|endoftext|>'])
 
 lang_id2num = {'special_token': 0, 'english': 1, 'malay': 2, 'other': 3}
 lang_num2id = {v: k for k, v in lang_id2num.items()}

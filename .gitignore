@@ -1,7 +1,9 @@
 __pycache__
 
-data/malaya/*
-data/scrapping/*
+data/*
+!data/combined_data.csv
+!data/preprocessing_data.ipynb
+!data/get_twitter_data.ipynb
 
 dictionary/*
 !dictionary/combined-malay-dict.txt
