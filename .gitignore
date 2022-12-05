@@ -2,6 +2,7 @@ __pycache__
 
 data/*
 !data/combined_data.csv
+!data/combined_data_50001_clean.csv
 !data/preprocessing_data.ipynb
 !data/get_twitter_data.ipynb
 
