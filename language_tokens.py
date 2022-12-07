@@ -4,6 +4,7 @@
 
 # import json
 import nltk
+nltk.download('words')
 
 # my_raw1 = json.load(open('../dictionary/200k-english-malay.json'))
 # my_raw2 = open('../dictionary/en-ms.txt', encoding="utf8")
