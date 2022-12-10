@@ -19,7 +19,7 @@ nltk.download('words')
 #         if item:
 #             fp.write("%s\n" % item)
 
-with open('../../dictionary/combined-malay-dict.txt', encoding="utf8") as fp:
+with open('combined-malay-dict.txt', encoding="utf8") as fp:
     malay_dict = set([x.strip() for x in fp.readlines()])
 
 eng_dict = set(nltk.corpus.words.words())

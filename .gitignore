@@ -8,6 +8,7 @@ data/*
 
 dictionary/*
 !dictionary/combined-malay-dict.txt
+!dictionary/language_tokens.py
 
 pickle/*
 saved_model/*
