@@ -2,6 +2,7 @@ import {
   Button,
   ChakraProvider,
   Container,
+  Divider,
   HStack,
   Radio,
   RadioGroup,
@@ -12,9 +13,22 @@ import {
 import { useState } from 'react'
 
 const App = () => {
-  const [modelSelect, setModelSelect] = useState('bert+li')
+  const [senClass, setSenClass] = useState('')
+  const [senPolarity, setSenPolarity] = useState('')
+  // const [modelSelect, setModelSelect] = useState('bert+li')
 
-  const handleClick = () => {}
+  const handleClick = () => {
+    let data = new FormData()
+    data.append('sentence', senClass)
+    fetch('http://localhost:8000', {
+      method: 'POST',
+      body: data,
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        setSenPolarity(res?.output ?? '')
+      })
+  }
 
   return (
     <ChakraProvider>
@@ -23,20 +37,43 @@ const App = () => {
           <Text fontWeight="bold" fontSize="2xl">
             Sentiment Classification
           </Text>
-          <Textarea placeholder="Enter sentences here..." resize="none" />
+          <Textarea
+            value={senClass}
+            onChange={(e) => setSenClass(e.target.value)}
+            placeholder="Enter sentences here..."
+            resize="none"
+          />
           <HStack w="full" justify="space-between">
-            <RadioGroup onChange={setModelSelect} value={modelSelect}>
+            {/* <RadioGroup onChange={setModelSelect} value={modelSelect}>
               <HStack spacing={6}>
                 <Radio value="bert+li">BERT + LI</Radio>
                 <Radio value="xlmr+li">XLM-R + LI</Radio>
                 <Radio value="gpt2+li">GPT2 + LI</Radio>
               </HStack>
-            </RadioGroup>
+            </RadioGroup> */}
             <Button colorScheme="teal" onClick={handleClick}>
               Run
             </Button>
           </HStack>
         </VStack>
+        {senPolarity}
+        <Divider my={10} />
+        {/* <VStack align="flex-start">
+          <Text fontWeight="bold" fontSize="2xl">
+            Sentiment Classification
+          </Text>
+          <Textarea
+            value={senSen}
+            onChange={(e) => setSenSen(e.target.value)}
+            placeholder="Enter sentences here..."
+            resize="none"
+          />
+          <HStack w="full" justify="space-between">
+            <Button colorScheme="teal" onClick={handleClick}>
+              Run
+            </Button>
+          </HStack>
+        </VStack> */}
       </Container>
     </ChakraProvider>
   )

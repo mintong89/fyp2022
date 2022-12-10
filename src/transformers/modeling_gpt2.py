@@ -1055,7 +1055,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             "past_key_values": past,
             "use_cache": kwargs.get("use_cache"),
             "position_ids": position_ids,
-            'languange_ids': language_ids,
+            'language_ids': language_ids,
             "attention_mask": attention_mask,
             "token_type_ids": token_type_ids,
         }
