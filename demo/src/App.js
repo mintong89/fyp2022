@@ -13,67 +13,109 @@ import {
 import { useState } from 'react'
 
 const App = () => {
-  const [senClass, setSenClass] = useState('')
-  const [senPolarity, setSenPolarity] = useState('')
-  // const [modelSelect, setModelSelect] = useState('bert+li')
+  const senValue = ['negative', 'neutral', 'positive']
 
-  const handleClick = () => {
+  const [modelSelect, setModelSelect] = useState('bert')
+
+  const [isLoading, setLoading] = useState(false)
+  const [loadingText, setLoadingText] = useState(<></>)
+
+  const [senSentence, senSenSentence] = useState('')
+  const [senPolarity, setSenPolarity] = useState('')
+
+  const callPython = ({
+    inputs = {},
+    outputs = (res) => {},
+    inputsLoading = <></>,
+    outputsLoading = <></>,
+  }) => {
     let data = new FormData()
-    data.append('sentence', senClass)
+    data.append('data', JSON.stringify(inputs))
+    setLoading(true)
+    setLoadingText(inputsLoading)
+
     fetch('http://localhost:8000', {
       method: 'POST',
       body: data,
     })
       .then((res) => res.json())
       .then((res) => {
-        setSenPolarity(res?.output ?? '')
+        outputs(res)
+        setLoadingText(outputsLoading)
       })
   }
 
   return (
     <ChakraProvider>
       <Container maxW="6xl" my={4}>
-        <VStack align="flex-start">
+        <VStack align="flex-start" spacing={4}>
           <Text fontWeight="bold" fontSize="2xl">
             Sentiment Classification
           </Text>
           <Textarea
-            value={senClass}
-            onChange={(e) => setSenClass(e.target.value)}
+            value={senSentence}
+            onChange={(e) => senSenSentence(e.target.value)}
             placeholder="Enter sentences here..."
             resize="none"
           />
-          <HStack w="full" justify="space-between">
-            {/* <RadioGroup onChange={setModelSelect} value={modelSelect}>
-              <HStack spacing={6}>
-                <Radio value="bert+li">BERT + LI</Radio>
-                <Radio value="xlmr+li">XLM-R + LI</Radio>
-                <Radio value="gpt2+li">GPT2 + LI</Radio>
-              </HStack>
-            </RadioGroup> */}
-            <Button colorScheme="teal" onClick={handleClick}>
+          <RadioGroup
+            onChange={(value) => {
+              setModelSelect(value)
+              setSenPolarity('')
+              callPython({
+                inputs: {
+                  function: 'change_model',
+                  model_type: value,
+                },
+                outputs: () => {
+                  setLoading(false)
+                },
+                inputsLoading: <>Loading model...</>,
+                outputsLoading: <>Loading completed.</>,
+              })
+            }}
+            value={modelSelect}
+          >
+            <HStack spacing={4}>
+              <Radio value="bert">BERT+LI</Radio>
+              <Radio value="xlmr">XLM-R+LI</Radio>
+            </HStack>
+          </RadioGroup>
+          <HStack spacing={4}>
+            <Button
+              colorScheme="teal"
+              onClick={() =>
+                callPython({
+                  inputs: {
+                    function: 'run_script',
+                    sentence: senSentence,
+                  },
+                  outputs: (res) => {
+                    setSenPolarity(res?.output ?? '')
+                    setLoading(false)
+                  },
+                  inputsLoading: <>Running script...</>,
+                  outputsLoading: <>Running completed.</>,
+                })
+              }
+              isLoading={isLoading}
+              isDisabled={senSentence.length === 0}
+            >
               Run
             </Button>
+            <Text>{loadingText}</Text>
           </HStack>
+          <Text fontSize="lg">
+            {senPolarity && (
+              <>
+                <b>Result:</b> The sentence is a {senValue[senPolarity]}{' '}
+                sentence.
+              </>
+            )}
+          </Text>
         </VStack>
-        {senPolarity}
+
         <Divider my={10} />
-        {/* <VStack align="flex-start">
-          <Text fontWeight="bold" fontSize="2xl">
-            Sentiment Classification
-          </Text>
-          <Textarea
-            value={senSen}
-            onChange={(e) => setSenSen(e.target.value)}
-            placeholder="Enter sentences here..."
-            resize="none"
-          />
-          <HStack w="full" justify="space-between">
-            <Button colorScheme="teal" onClick={handleClick}>
-              Run
-            </Button>
-          </HStack>
-        </VStack> */}
       </Container>
     </ChakraProvider>
   )

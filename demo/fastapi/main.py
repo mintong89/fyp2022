@@ -2,41 +2,16 @@ from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 import torch
-from transformers import BertTokenizer, BertConfig
+from torch.utils.data import Dataset
+from transformers import BertTokenizer, BertConfig, XLMRobertaTokenizer, XLMRobertaConfig
 from modeling_bert import BertForSequenceClassification
+from modeling_xlm_roberta import XLMRobertaForSequenceClassification
 from language_tokens import get_lang_tokens
 import numpy as np
+import pandas as pd
+import json
 
-from unidecode import unidecode
-import re
-
-punctuation = '‘’“”!$%&\()*+,./:;<=>?[\\]^_`{|}~•@…'
-
-
-def clean_text(text):
-    # convert characters to ascii
-    text = unidecode(text)
-
-    # remove words that is hashtags, mentions and links
-    text = re.sub(r'^([@#]|http|https)[^\s]*', '', text)
-
-    # remove punctuation
-    text = text.translate(text.maketrans('', '', punctuation))
-
-    # remove next line
-    text = re.sub('\n', '', text)
-
-    # lowercasing text
-    text = text.lower()
-
-    # stripping text
-    text = text.strip()
-
-    # remove words containing numbers
-    text = re.sub('\w*\d\w*', '', text)
-
-    return text
-
+from preprocessing_data import clean_text, normalise_text
 
 app = FastAPI()
 app.add_middleware(
@@ -47,80 +22,222 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+MODEL_TYPE = 'bert-base-multilingual-uncased'
+
+tokenizer = BertTokenizer.from_pretrained(
+    MODEL_TYPE, do_lower_case=True)
+
+config = BertConfig.from_pretrained(
+    MODEL_TYPE,
+    num_labels=64,
+    output_attentions=False,
+    output_hidden_states=False,
+    num_hidden_layers=5,
+    num_attention_heads=8,
+    hidden_dropout_prob=0.2,
+    attention_probs_dropout_prob=0.2,
+    ignore_mismatched_sizes=True
+)
+
+model = BertForSequenceClassification.from_pretrained(
+    MODEL_TYPE,
+    config=config
+)
+
+device = torch.device('cpu')
+model.to(device)
+
+with open('../../saved_model/model_bert+li_sentiment.bin', 'rb') as fp:
+    states = torch.load(fp,
+                        map_location=torch.device('cpu'))
+    model.load_state_dict(states['model'])
+
+model.eval()
+torch.set_grad_enabled(False)
+
+
+def change_model(model_type: str):
+    global MODEL_TYPE
+    global tokenizer
+    global model
+
+    if model_type == 'bert':
+
+        tokenizer = BertTokenizer.from_pretrained(
+            'bert-base-multilingual-uncased', do_lower_case=True)
+
+        config = BertConfig.from_pretrained(
+            'bert-base-multilingual-uncased',
+            num_labels=64,
+            output_attentions=False,
+            output_hidden_states=False,
+            num_hidden_layers=5,
+            num_attention_heads=8,
+            hidden_dropout_prob=0.2,
+            attention_probs_dropout_prob=0.2,
+            ignore_mismatched_sizes=True
+        )
+
+        model = BertForSequenceClassification.from_pretrained(
+            'bert-base-multilingual-uncased',
+            config=config
+        )
+
+        with open('../../saved_model/model_bert+li_sentiment.bin', 'rb') as fp:
+            states = torch.load(fp,
+                                map_location=torch.device('cpu'))
+            model.load_state_dict(states['model'])
+
+        model.eval()
+        torch.set_grad_enabled(False)
+
+    elif model_type == 'xlmr':
+
+        tokenizer = XLMRobertaTokenizer.from_pretrained(
+            'xlm-roberta-base', do_lower_case=True)
+
+        config = XLMRobertaConfig.from_pretrained(
+            'xlm-roberta-base',
+            num_labels=64,
+            output_attentions=False,
+            output_hidden_states=False,
+            num_hidden_layers=5,
+            num_attention_heads=8,
+            hidden_dropout_prob=0.2,
+            attention_probs_dropout_prob=0.2,
+            ignore_mismatched_sizes=True
+        )
+
+        model = XLMRobertaForSequenceClassification.from_pretrained(
+            'xlm-roberta-base',
+            config=config
+        )
+
+        with open('../../saved_model/model_xlmr+li_sentiment.bin', 'rb') as fp:
+            states = torch.load(fp,
+                                map_location=torch.device('cpu'))
+            model.load_state_dict(states['model'])
+
+        model.eval()
+        torch.set_grad_enabled(False)
+
+
+def run_script(sentence: str):
+    # ====================================
+    # get data
+
+    clean_sentence = normalise_text(clean_text(sentence))
+    df_sentence = pd.concat([pd.DataFrame([clean_sentence], columns=['text'])],
+                            ignore_index=True)
+
+    # ====================================
+    class TestDataset(Dataset):
+
+        def __init__(self, df):
+            self.df_data = df
+
+        def __getitem__(self, index):
+
+            # get the sentence from the dataframe
+            features = self.df_data.loc[index, 'text']
+
+            # Process the sentence
+            # ---------------------
+
+            encoded_dict = tokenizer.encode_plus(
+                features,           # Sentence to encode.
+                add_special_tokens=True,      # Add '[CLS]' and '[SEP]'
+                truncation=True,
+                max_length=256,           # Pad or truncate all sentences.
+                pad_to_max_length=True,
+                return_attention_mask=True,   # Construct attn. masks.
+                return_tensors='pt',          # Return pytorch tensors.
+            )
+
+            # These are torch tensors already.
+            input_ids = encoded_dict['input_ids'][0]
+            att_mask = encoded_dict['attention_mask'][0]
+            token_type_ids = encoded_dict['token_type_ids'][0]
+            language_ids = torch.tensor(get_lang_tokens(
+                [x.replace(' ', '')
+                 for x in tokenizer.batch_decode(input_ids.tolist())]
+            ))
+
+            sample = (input_ids, att_mask, token_type_ids,
+                      language_ids, features)
+            return sample
+
+        def __len__(self):
+            return len(self.df_data)
+
+    test_data = TestDataset(df_sentence)
+
+    b_input_ids = []
+    b_input_mask = []
+    b_token_type_ids = []
+    b_language_ids = []
+
+    b_input_ids.append(test_data[0][0].tolist())
+    b_input_mask.append(test_data[0][1].tolist())
+    b_token_type_ids.append(test_data[0][2].tolist())
+    b_language_ids.append(test_data[0][3].tolist())
+
+    b_input_ids = torch.tensor(b_input_ids)
+    b_input_mask = torch.tensor(b_input_mask)
+    b_token_type_ids = torch.tensor(b_token_type_ids)
+    b_language_ids = torch.tensor(b_language_ids)
+
+    # ====================================
+
+    model_preds_list = []
+
+    for _ in range(5):
+        stacked_val_preds = None
+        model.eval()
+        torch.set_grad_enabled(False)
+
+        outputs = model(b_input_ids.to(device),
+                        token_type_ids=b_token_type_ids.to(device),
+                        language_ids=b_language_ids.to(device),
+                        attention_mask=b_input_mask.to(device))
+
+        preds = outputs[0]
+        val_preds = preds.detach().cpu().numpy()
+
+        if stacked_val_preds is None:
+            stacked_val_preds = val_preds
+
+        else:
+            stacked_val_preds = np.vstack((stacked_val_preds, val_preds))
+
+        model_preds_list.append(stacked_val_preds)
+
+    print('\nPrediction complete.')
+
+    # ====================================
+
+    for i, item in enumerate(model_preds_list):
+
+        if i == 0:
+            preds = item
+        else:
+            preds = item + preds
+
+    avg_preds = preds/(len(model_preds_list))
+    test_preds = np.argmax(avg_preds, axis=1)
+
+    # ====================================
+
+    return {'output': str(test_preds[0])}
+
 
 @app.post("/")
-async def root(sentence: str = Form()):
-    MODEL_TYPE = 'bert-base-multilingual-uncased'
-    test_ids = []
-    test_attention_mask = []
-    test_token_type_ids = []
-    test_language_ids = []
+async def root(data=Form()):
 
-    tokenizer = BertTokenizer.from_pretrained(
-        MODEL_TYPE, do_lower_case=True)
+    data_list = json.loads(data)
 
-    encoded_dict = tokenizer.encode_plus(
-        sentence,           # Sentences to encode.
-        add_special_tokens=True,      # Add '[CLS]' and '[SEP]'
-        max_length=256,           # Pad or truncate all sentences.
-        pad_to_max_length=True,
-        return_attention_mask=True,   # Construct attn. masks.
-        return_tensors='pt',          # Return pytorch tensors.
-    )
+    if data_list['function'] == 'run_script':
+        return run_script(data_list['sentence'])
 
-    padded_token_list = encoded_dict['input_ids']
-    att_mask = encoded_dict['attention_mask']
-    token_type_ids = encoded_dict['token_type_ids']
-    language_ids = torch.tensor(get_lang_tokens(
-        [x.replace(' ', '')
-         for x in tokenizer.batch_decode(padded_token_list.tolist())]
-    ))
-
-    num_to_sentiment = {
-        0: 'Negative',
-        1: 'Neutral',
-        2: 'Positive'
-    }
-
-    config = BertConfig.from_pretrained(
-        MODEL_TYPE,
-        num_labels=64,
-        output_attentions=False,
-        output_hidden_states=False,
-        num_hidden_layers=5,
-        num_attention_heads=8,
-        hidden_dropout_prob=0.2,
-        attention_probs_dropout_prob=0.2,
-        ignore_mismatched_sizes=True
-    )
-
-    model = BertForSequenceClassification.from_pretrained(
-        MODEL_TYPE,
-        config=config
-    )
-
-    device = torch.device('cpu')
-    model.to(device)
-
-    with open('../../saved_model/model_bert+li.bin', 'rb') as fp:
-        states = torch.load('../../saved_model/model_bert+li.bin',
-                            map_location=torch.device('cpu'))
-        model.load_state_dict(states['model'])
-
-    model.eval()
-    torch.set_grad_enabled(False)
-
-    with torch.no_grad():
-        outputs = model(padded_token_list.to(device),
-                        token_type_ids=att_mask.to(device),
-                        attention_mask=token_type_ids.to(device),
-                        language_ids=language_ids.to(device)
-                        )
-
-    preds = outputs[0]
-
-    val_preds = preds.detach().cpu().numpy()
-
-    final_preds = np.argmax(val_preds, axis=1)
-
-    return {'output': num_to_sentiment[final_preds[0]]}
+    elif data_list['function'] == 'change_model':
+        return change_model(data_list['model_type'])
