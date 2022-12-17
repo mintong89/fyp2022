@@ -30,7 +30,7 @@ def detect_english(text): return text in eng_dict
 
 
 special_token_list = set(
-    ['[CLS]', '[SEP]', '[PAD]', '[UNK]', '<s>', '</s>', '<pad>', '<unk>', '<mask>', '<|endoftext|>'])
+    ['[CLS]', '[SEP]', '[PAD]', '[UNK]', '[MASK]', '<s>', '</s>', '<pad>', '<unk>', '<mask>', '<|endoftext|>', '<|beginoftext|>', '<|pad|>', '<|sep|>', '<|mask|>'])
 
 lang_id2num = {'special_token': 0, 'english': 1, 'malay': 2, 'other': 3}
 lang_num2id = {v: k for k, v in lang_id2num.items()}
@@ -52,7 +52,7 @@ def get_lang_tokens(decoded_input_tokens):
 
     full_sentence = ''
     token_count = 0
-    for token in decoded_input_tokens:
+    for token in list(reversed(decoded_input_tokens)):
         if '##' in token:
             full_sentence = token[2:] + full_sentence
             token_count += 1
@@ -67,4 +67,28 @@ def get_lang_tokens(decoded_input_tokens):
         full_sentence = ''
         token_count = 0
 
-    return language_ids
+    return list(reversed(language_ids))
+
+
+def get_lang_tokens_gpt2(decoded_input_tokens):
+    language_ids = []
+
+    full_sentence = ''
+    token_count = 0
+    for token in list(reversed(decoded_input_tokens)):
+        if token[0] == ' ':
+            if len(token) != 1:
+                full_sentence = token[1:] + full_sentence
+            token_count += 1
+            continue
+
+        full_sentence = token + full_sentence
+        token_count += 1
+        lang_token = lang_id2num[detect_lang(full_sentence)]
+        for _ in range(token_count):
+            language_ids.append(lang_token)
+
+        full_sentence = ''
+        token_count = 0
+
+    return list(reversed(language_ids))

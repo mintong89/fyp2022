@@ -9,6 +9,8 @@ data/*
 dictionary/*
 !dictionary/combined-malay-dict.txt
 !dictionary/language_tokens.py
+!dictionary/create_gpt2_tokenizer.ipynb
+!dictionary/tokenizer-gpt2.bin
 
 pickle/*
 saved_model/*
