@@ -2,10 +2,12 @@ from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 import torch
+import pickle
 from torch.utils.data import Dataset
-from transformers import BertTokenizer, BertConfig, XLMRobertaTokenizer, XLMRobertaConfig
+from transformers import BertTokenizer, BertConfig, XLMRobertaTokenizer, XLMRobertaConfig, GPT2Config
 from modeling_bert import BertForSequenceClassification
 from modeling_xlm_roberta import XLMRobertaForSequenceClassification
+from modeling_gpt2 import GPT2ForSequenceClassification
 from language_tokens import get_lang_tokens
 import numpy as np
 import pandas as pd
@@ -22,13 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_TYPE = 'bert-base-multilingual-uncased'
+MODEL_TYPE = 'bert'
 
 tokenizer = BertTokenizer.from_pretrained(
-    MODEL_TYPE, do_lower_case=True)
+    'bert-base-multilingual-uncased', do_lower_case=True)
 
 config = BertConfig.from_pretrained(
-    MODEL_TYPE,
+    'bert-base-multilingual-uncased',
     num_labels=64,
     output_attentions=False,
     output_hidden_states=False,
@@ -40,7 +42,7 @@ config = BertConfig.from_pretrained(
 )
 
 model = BertForSequenceClassification.from_pretrained(
-    MODEL_TYPE,
+    'bert-base-multilingual-uncased',
     config=config
 )
 
@@ -98,7 +100,7 @@ def change_model(model_type: str):
 
         config = XLMRobertaConfig.from_pretrained(
             'xlm-roberta-base',
-            num_labels=64,
+            num_labels=3,
             output_attentions=False,
             output_hidden_states=False,
             num_hidden_layers=5,
@@ -120,6 +122,37 @@ def change_model(model_type: str):
 
         model.eval()
         torch.set_grad_enabled(False)
+
+    elif model_type == 'gpt2':
+
+        with open('../../dictionary/tokenizer-gpt2.bin', 'rb') as fp:
+            tokenizer = pickle.load(fp)
+
+        tokenizer.padding_side = 'left'
+
+        model_config = GPT2Config.from_pretrained(
+            'gpt2',
+            num_labels=3,
+            output_attentions=False,
+            output_hidden_states=False,
+            num_hidden_layers=5,
+            num_attention_heads=8,
+            hidden_dropout_prob=0.2,
+            attention_probs_dropout_prob=0.2,
+            ignore_mismatched_sizes=True,
+            bos_token_id=tokenizer.bos_token_id,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            sep_token_id=tokenizer.sep_token_id
+        )
+        model = GPT2ForSequenceClassification.from_pretrained(
+            'gpt2', config=model_config)
+        model.resize_token_embeddings(len(tokenizer))
+
+        model.eval()
+        torch.set_grad_enabled(False)
+
+    MODEL_TYPE = model_type
 
 
 def run_script(sentence: str):
@@ -157,14 +190,20 @@ def run_script(sentence: str):
             # These are torch tensors already.
             input_ids = encoded_dict['input_ids'][0]
             att_mask = encoded_dict['attention_mask'][0]
-            token_type_ids = encoded_dict['token_type_ids'][0]
+
             language_ids = torch.tensor(get_lang_tokens(
                 [x.replace(' ', '')
                  for x in tokenizer.batch_decode(input_ids.tolist())]
             ))
 
-            sample = (input_ids, att_mask, token_type_ids,
-                      language_ids, features)
+            if MODEL_TYPE == 'bert':
+                token_type_ids = encoded_dict['token_type_ids'][0]
+                sample = (input_ids, att_mask, token_type_ids,
+                          language_ids, features)
+            else:
+                sample = (input_ids, att_mask,
+                          language_ids, features)
+
             return sample
 
         def __len__(self):
@@ -174,17 +213,23 @@ def run_script(sentence: str):
 
     b_input_ids = []
     b_input_mask = []
-    b_token_type_ids = []
     b_language_ids = []
 
     b_input_ids.append(test_data[0][0].tolist())
     b_input_mask.append(test_data[0][1].tolist())
-    b_token_type_ids.append(test_data[0][2].tolist())
-    b_language_ids.append(test_data[0][3].tolist())
+
+    if MODEL_TYPE == 'bert':
+        b_token_type_ids = []
+        b_token_type_ids.append(test_data[0][2].tolist())
+        b_token_type_ids = torch.tensor(b_token_type_ids)
+
+        b_language_ids.append(test_data[0][3].tolist())
+    else:
+        b_language_ids.append(test_data[0][2].tolist())
+
 
     b_input_ids = torch.tensor(b_input_ids)
     b_input_mask = torch.tensor(b_input_mask)
-    b_token_type_ids = torch.tensor(b_token_type_ids)
     b_language_ids = torch.tensor(b_language_ids)
 
     # ====================================
@@ -196,10 +241,15 @@ def run_script(sentence: str):
         model.eval()
         torch.set_grad_enabled(False)
 
-        outputs = model(b_input_ids.to(device),
-                        token_type_ids=b_token_type_ids.to(device),
-                        language_ids=b_language_ids.to(device),
-                        attention_mask=b_input_mask.to(device))
+        if MODEL_TYPE == 'bert':
+            outputs = model(b_input_ids.to(device),
+                            token_type_ids=b_token_type_ids.to(device),
+                            language_ids=b_language_ids.to(device),
+                            attention_mask=b_input_mask.to(device))
+        else:
+            outputs = model(b_input_ids.to(device),
+                            language_ids=b_language_ids.to(device),
+                            attention_mask=b_input_mask.to(device))
 
         preds = outputs[0]
         val_preds = preds.detach().cpu().numpy()

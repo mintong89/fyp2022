@@ -23,6 +23,12 @@ const App = () => {
   const [senSentence, senSenSentence] = useState('')
   const [senPolarity, setSenPolarity] = useState('')
 
+  const accuracy = {
+    bert: 0.7894,
+    xlmr: 0.8138,
+    gpt2: 0.5812,
+  }
+
   const callPython = ({
     inputs = {},
     outputs = (res) => {},
@@ -77,14 +83,16 @@ const App = () => {
             value={modelSelect}
           >
             <HStack spacing={4}>
-              <Radio value="bert">BERT+LI</Radio>
-              <Radio value="xlmr">XLM-R+LI</Radio>
+              <Radio value="bert">BERT+LE</Radio>
+              <Radio value="xlmr">XLM-R+LE</Radio>
+              <Radio value="gpt2">GPT2+LE</Radio>
             </HStack>
           </RadioGroup>
           <HStack spacing={4}>
             <Button
               colorScheme="teal"
-              onClick={() =>
+              onClick={() => {
+                setSenPolarity('')
                 callPython({
                   inputs: {
                     function: 'run_script',
@@ -97,7 +105,7 @@ const App = () => {
                   inputsLoading: <>Running script...</>,
                   outputsLoading: <>Running completed.</>,
                 })
-              }
+              }}
               isLoading={isLoading}
               isDisabled={senSentence.length === 0}
             >
@@ -105,7 +113,7 @@ const App = () => {
             </Button>
             <Text>{loadingText}</Text>
           </HStack>
-          <Text fontSize="lg">
+          <Text>
             {senPolarity && (
               <>
                 <b>Result:</b> The sentence is a {senValue[senPolarity]}{' '}
@@ -115,7 +123,11 @@ const App = () => {
           </Text>
         </VStack>
 
-        <Divider my={10} />
+        <Divider my={2} />
+
+        <Text>
+          Expected Accuracy: {(accuracy[modelSelect] * 100).toFixed(2)}%
+        </Text>
       </Container>
     </ChakraProvider>
   )
