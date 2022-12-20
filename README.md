@@ -1,4 +1,4 @@
-# Next word prediction and Sentiment analysis of intra-sentential Malay-English code-switching sentences
+# Performing MLM Transformers for inter-sentential Malay-English code-switching sentences
 Creator: Ong Chen Xiang
 <br>From: TARUMT Final Year Project 2022
 
@@ -8,17 +8,24 @@ Source code of transformer models with added language embeddings.
 
 ### Model List
 
-- BERT + Language Embeddings (BERT+LI)
-- XLM-R + Language Embeddings (XLM-R+LI)
-- GPT2 + Language Embeddings (GPT2+LI)
+- BERT + Language Embeddings (BERT+LE)
+- XLM-R + Language Embeddings (XLM-R+LE)
+- GPT2 + Language Embeddings (GPT2+LE)
 
-### Codes
+### Source Codes
+
+- `modeling_bert.py`: BERT+LE
+- `modeling_xlm_roberta.py`: XLM-R+LE
+- `modeling_gpt2.py`: GPT2+LE
+
+### Notebook Examples
 
 **Note: The jupyter notebook files are optimised to suited with Google Colab, additional changes (e.g. save files) are needed in order to perform successfully.**
 
-- `sentiment-analysis.ipynb`: Sentiment Analysis
+- `sentiment-analysis.ipynb`: Sentiment Analysis (BERT and XLM-Roberta only)
 - `masked-language-modeling.ipynb`: Masked Language Modeling (BERT and XLM-Roberta only)
-- `lm-head-model-gpt2.ipynb`: Model transformer with a language modeling head (GPT2 only)
+- `sentiment-analysis-gpt2.ipynb`: Sentiment Analysis (GPT2 only)
+- `language-modeling-gpt2.ipynb`: Model transformer with a language modeling head (GPT2 only)
 
 ## Credits
 
